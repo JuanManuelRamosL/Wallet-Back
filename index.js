@@ -24,10 +24,43 @@ app.get('/', async (req, res) => {
 
 app.get('/map', async (req, res) => {
     try {
-        const response = await axios.get('https://pro-api.coinmarketcap.com/v1/cryptocurrency/map?limit=15', {
+        const response = await axios.get('https://pro-api.coinmarketcap.com/v1/cryptocurrency/map?limit=20', {
             headers: {
                 'X-CMC_PRO_API_KEY': 'a4ec15fb-20b5-4f6c-996c-9d6c556e9412',
             },
+        });
+
+        res.json(response.data); // Devuelve los datos de la respuesta como JSON
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Hubo un error al obtener los datos de la API.' });
+    }
+});
+
+app.get('/map2', async (req, res) => {
+    try {
+        const response = await axios.get('https://pro-api.coinmarketcap.com/v1/cryptocurrency/map?limit=30', {
+            headers: {
+                'X-CMC_PRO_API_KEY': 'a4ec15fb-20b5-4f6c-996c-9d6c556e9412',
+            },
+        });
+
+        res.json(response.data); // Devuelve los datos de la respuesta como JSON
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Hubo un error al obtener los datos de la API.' });
+    }
+});
+
+app.get('/exchange', async (req, res) => {
+    try {
+        const response = await axios.get('https://pro-api.coinmarketcap.com/v1/exchange/info', {
+            
+            headers: {
+                'X-CMC_PRO_API_KEY': 'a4ec15fb-20b5-4f6c-996c-9d6c556e9412',
+            },params: {
+               slug:"binance,gdax,kraken"
+            }
         });
 
         res.json(response.data); // Devuelve los datos de la respuesta como JSON
@@ -76,7 +109,23 @@ app.post('/price', async (req, res) => {
         res.status(500).json({ error: 'Hubo un error al obtener los datos de la API.' });
     }
 });
+
+app.get('/map3', async (req, res) => {
+    try {
+        const response = await axios.get('https://pro-api.coinmarketcap.com/v1/exchange/map?limit=15', {
+            headers: {
+                'X-CMC_PRO_API_KEY': 'a4ec15fb-20b5-4f6c-996c-9d6c556e9412',
+            },
+        });
+
+        res.json(response.data); // Devuelve los datos de la respuesta como JSON
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Hubo un error al obtener los datos de la API.' });
+    }
+});
 // Inicia el servidor
 app.listen(PORT, () => {
     console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
+
