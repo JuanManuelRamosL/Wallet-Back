@@ -9,61 +9,24 @@ app.use(bodyParser.json());
 const { Sequelize, DataTypes } = require('sequelize');
 require('dotenv').config();
 
-const sequelize = new Sequelize(process.env.DB_DATABASE, process.env.DB_USERNAME, process.env.DB_PASSWORD, {
-    host: process.env.DB_HOST,
-    dialect: process.env.DB_DIALECT,
-    port: process.env.DB_PORT || 1111, // Usar el puerto de la variable de entorno o el puerto 5432 por defecto
-  });
 
-  sequelize.sync({ force: false })
-  .then(() => {
-    console.log('Base de datos sincronizada y tabla Users recreada.');
-  })
-  .catch(error => {
-    console.error('Error al sincronizar la base de datos:', error);
-  });
+const pg = require('pg');
+
+const { Pool } = pg;
+
+const pool = new Pool({
+  connectionString: process.env.POSTGRES_URL,
+});
+
+pool.connect((err) => {
+  if (err) throw err;
+  console.log("base de datos conectada");
+});
 
   // Definir el modelo User
-const User = sequelize.define('User', {
-    firstName: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    lastName: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    email: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: true,
-    },
-    favs:{
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true,
-    }
-  }, {
-    // Otros parámetros del modelo
-  });
-  
+ 
   // Sincronizar el modelo con la base de datos
-  sequelize.sync();
-
-app.get('/', async (req, res) => {
-    try {
-        const response = await axios.get('https://sandbox-api.coinmarketcap.com/v1/cryptocurrency/listings/latest', {
-            headers: {
-                'X-CMC_PRO_API_KEY': 'a4ec15fb-20b5-4f6c-996c-9d6c556e9412',
-            },
-        });
-
-        res.json(response.data); // Devuelve los datos de la respuesta como JSON
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Hubo un error al obtener los datos de la API.' });
-    }
-});
+  
 
 app.get('/map', async (req, res) => {
     try {
@@ -171,10 +134,14 @@ app.get('/map3', async (req, res) => {
 
 //usuarios
 app.post('/users', async (req, res) => {
+    const { firstName, lastName, email, favs } = req.body;
+  
     try {
-      const { firstName, lastName, email,favs } = req.body;
-      const newUser = await User.create({ firstName, lastName, email,favs });
-      res.status(201).json(newUser);
+      const result = await pool.query(
+        'INSERT INTO users (first_name, last_name, email, favs) VALUES ($1, $2, $3, $4) RETURNING *',
+        [firstName, lastName, email, favs]
+      );
+      res.status(201).json(result.rows[0]);
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Hubo un error al crear el usuario.' });
@@ -182,21 +149,105 @@ app.post('/users', async (req, res) => {
   });
 
 
+  app.put('/users/:id/favs', async (req, res) => {
+    const userId = req.params.id;
+    const { favs: newFavs } = req.body;
+  
+    try {
+      // Obtener el contenido actual de favs del usuario
+      const result = await pool.query(
+        'SELECT favs FROM users WHERE id = $1',
+        [userId]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+      const { favs: currentFavs } = result.rows[0];
+  
+      // Concatenar el nuevo contenido con el existente
+      const updatedFavs = currentFavs ? `${currentFavs}, ${newFavs}` : newFavs;
+  
+      // Actualizar favs del usuario con el nuevo contenido
+      await pool.query(
+        'UPDATE users SET favs = $1 WHERE id = $2',
+        [updatedFavs, userId]
+      );
+  
+      // Responder con el usuario actualizado
+      res.json({ id: userId, favs: updatedFavs });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Hubo un error al actualizar los favs del usuario.' });
+    }
+  });
+  
+  // Endpoint para eliminar todo el contenido de favs
+  app.delete('/users/:id/favs', async (req, res) => {
+    const userId = req.params.id;
+  
+    try {
+      const result = await pool.query(
+        'UPDATE users SET favs = NULL WHERE id = $1 RETURNING *',
+        [userId]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Hubo un error al eliminar los favs del usuario.' });
+    }
+  });
+
+
+  //eliminar elemento especifico 
+
+  app.delete('/users/:id/favss', async (req, res) => {
+    const userId = req.params.id;
+    const elementToRemove = req.body.element;
+  
+    if (!elementToRemove) {
+      return res.status(400).json({ error: 'Se requiere especificar el elemento a eliminar en el cuerpo de la solicitud.' });
+    }
+  
+    try {
+      // Obtener el contenido actual de favs del usuario
+      const result = await pool.query(
+        'SELECT favs FROM users WHERE id = $1',
+        [userId]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+      const { favs: currentFavs } = result.rows[0];
+  
+      // Verificar si el elemento a eliminar está en la lista
+      if (!currentFavs || !currentFavs.includes(elementToRemove)) {
+        return res.status(404).json({ error: 'El elemento especificado no existe en favs' });
+      }
+  
+      // Eliminar el elemento específico de la lista
+      const updatedFavs = currentFavs.split(', ').filter(item => item !== elementToRemove).join(', ');
+  
+      // Actualizar favs del usuario con la lista modificada
+      await pool.query(
+        'UPDATE users SET favs = $1 WHERE id = $2',
+        [updatedFavs, userId]
+      );
+  
+      // Responder con el usuario actualizado
+      res.json({ id: userId, favs: updatedFavs });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Hubo un error al eliminar el elemento de favs.' });
+    }
+  });
 // Inicia el servidor
 app.listen(PORT, () => {
     console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
 
 
+//hacer npm install ya que se añadio la dependencia de pg
 
-
-// config de conexion a bd desplegada 
-/* const sequelize = new Sequelize("postgres://juan:mgrSUsNkOyQuK5lQQipKsSo8281Duvde@dpg-co8lteol5elc739184eg-a.oregon-postgres.render.com/bd_galery", {
-  dialect: "postgres",
-  dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false // Deshabilita la verificación del certificado SSL
-    }
-  }
-}); */
