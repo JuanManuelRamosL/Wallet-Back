@@ -133,21 +133,62 @@ app.get('/map3', async (req, res) => {
 
 
 //usuarios
+
+app.get('/users/:id', async (req, res) => {
+  const userId = req.params.id;
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Hubo un error al obtener el usuario.' });
+  }
+});
+
 app.post('/users', async (req, res) => {
-    const { firstName, lastName, email, favs } = req.body;
+  const { first_name, last_name, email, favs } = req.body;
+
+  try {
+    const result = await pool.query(
+      'INSERT INTO users (first_name, last_name, email, favs) VALUES ($1, $2, $3, $4) RETURNING *',
+      [first_name, last_name, email, favs]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Hubo un error al crear el usuario.' });
+  }
+});
+
+
+  app.delete('/users/:id', async (req, res) => {
+    const userId = req.params.id;
   
     try {
       const result = await pool.query(
-        'INSERT INTO users (first_name, last_name, email, favs) VALUES ($1, $2, $3, $4) RETURNING *',
-        [firstName, lastName, email, favs]
+        'DELETE FROM users WHERE id = $1 RETURNING *',
+        [userId]
       );
-      res.status(201).json(result.rows[0]);
+  
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+  
+      res.json({ message: 'Usuario eliminado con éxito', user: result.rows[0] });
     } catch (error) {
       console.error(error);
-      res.status(500).json({ error: 'Hubo un error al crear el usuario.' });
+      res.status(500).json({ error: 'Hubo un error al eliminar el usuario.' });
     }
   });
-
 
   app.put('/users/:id/favs', async (req, res) => {
     const userId = req.params.id;
