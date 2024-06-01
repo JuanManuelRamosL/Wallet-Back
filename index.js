@@ -158,6 +158,14 @@ app.post('/users', async (req, res) => {
   const { first_name, last_name, email, favs } = req.body;
 
   try {
+    // Verifica si el usuario ya existe
+    const userCheck = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (userCheck.rows.length > 0) {
+      // Si el usuario ya existe, devuelve los datos del usuario existente
+      return res.status(200).json(userCheck.rows[0]);
+    }
+
+    // Inserta el nuevo usuario
     const result = await pool.query(
       'INSERT INTO users (first_name, last_name, email, favs) VALUES ($1, $2, $3, $4) RETURNING *',
       [first_name, last_name, email, favs]
@@ -190,35 +198,45 @@ app.post('/users', async (req, res) => {
     }
   });
 
-  app.put('/users/:id/favs', async (req, res) => {
-    const userId = req.params.id;
+  app.put('/users/:email/favs', async (req, res) => {
+    const userEmail = req.params.email;
     const { favs: newFavs } = req.body;
   
     try {
       // Obtener el contenido actual de favs del usuario
       const result = await pool.query(
-        'SELECT favs FROM users WHERE id = $1',
-        [userId]
+        'SELECT favs FROM users WHERE email = $1',
+        [userEmail]
       );
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Usuario no encontrado' });
       }
       const { favs: currentFavs } = result.rows[0];
   
-      // Concatenar el nuevo contenido con el existente
-      const updatedFavs = currentFavs ? `${currentFavs}, ${newFavs}` : newFavs;
+      // Convertir currentFavs y newFavs a arrays
+      const currentFavsArray = currentFavs ? currentFavs.split(', ').map(fav => fav.trim()) : [];
+      const newFavsArray = newFavs.split(', ').map(fav => fav.trim());
+  
+      // Agregar solo los nuevos favoritos que no están en currentFavs
+      const uniqueNewFavs = newFavsArray.filter(fav => !currentFavsArray.includes(fav));
+      if (uniqueNewFavs.length === 0) {
+        return res.status(200).json({ message: 'No se añadieron favoritos ya existentes' });
+      }
+  
+      // Concatenar los nuevos favoritos únicos con los existentes
+      const updatedFavsArray = [...currentFavsArray, ...uniqueNewFavs];
+      const updatedFavs = updatedFavsArray.join(', ');
   
       // Actualizar favs del usuario con el nuevo contenido
       await pool.query(
-        'UPDATE users SET favs = $1 WHERE id = $2',
-        [updatedFavs, userId]
+        'UPDATE users SET favs = $1 WHERE email = $2',
+        [updatedFavs, userEmail]
       );
   
-      // Responder con el usuario actualizado
-      res.json({ id: userId, favs: updatedFavs });
+      res.status(200).json({ message: 'Favoritos actualizados exitosamente' });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: 'Hubo un error al actualizar los favs del usuario.' });
+      console.error('Error al actualizar los favoritos:', error);
+      res.status(500).json({ error: 'Hubo un error al actualizar los favoritos' });
     }
   });
   
@@ -244,8 +262,8 @@ app.post('/users', async (req, res) => {
 
   //eliminar elemento especifico 
 
-  app.delete('/users/:id/favss', async (req, res) => {
-    const userId = req.params.id;
+  app.delete('/users/:email/favss', async (req, res) => {
+    const userEmail = req.params.email;
     const elementToRemove = req.body.element;
   
     if (!elementToRemove) {
@@ -255,8 +273,8 @@ app.post('/users', async (req, res) => {
     try {
       // Obtener el contenido actual de favs del usuario
       const result = await pool.query(
-        'SELECT favs FROM users WHERE id = $1',
-        [userId]
+        'SELECT favs FROM users WHERE email = $1',
+        [userEmail]
       );
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -273,12 +291,12 @@ app.post('/users', async (req, res) => {
   
       // Actualizar favs del usuario con la lista modificada
       await pool.query(
-        'UPDATE users SET favs = $1 WHERE id = $2',
-        [updatedFavs, userId]
+        'UPDATE users SET favs = $1 WHERE email = $2',
+        [updatedFavs, userEmail]
       );
   
       // Responder con el usuario actualizado
-      res.json({ id: userId, favs: updatedFavs });
+      res.json({ email: userEmail, favs: updatedFavs });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Hubo un error al eliminar el elemento de favs.' });
