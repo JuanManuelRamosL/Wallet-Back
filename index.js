@@ -302,6 +302,30 @@ app.post('/users', async (req, res) => {
       res.status(500).json({ error: 'Hubo un error al eliminar el elemento de favs.' });
     }
   });
+
+  app.get('/users/:email/favsList', async (req, res) => {
+    const userEmail = req.params.email;
+  
+    try {
+      // Obtener los favoritos del usuario
+      const result = await pool.query(
+        'SELECT favs FROM users WHERE email = $1',
+        [userEmail]
+      );
+  
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+  
+      const { favs } = result.rows[0];
+  
+      // Devolver los favoritos del usuario
+      res.json({ email: userEmail, favs });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Hubo un error al obtener los favoritos del usuario.' });
+    }
+  });
 // Inicia el servidor
 app.listen(PORT, () => {
     console.log(`Servidor escuchando en el puerto ${PORT}`);
