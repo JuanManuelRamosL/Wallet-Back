@@ -3,7 +3,8 @@ const axios = require('axios');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const app = express();
-const PORT = 3100;
+
+const port = process.env.PORT || 3100; 
 app.use(cors());
 app.use(bodyParser.json());
 const { Sequelize, DataTypes } = require('sequelize');
@@ -327,8 +328,8 @@ app.post('/users', async (req, res) => {
     }
   });
 // Inicia el servidor
-app.listen(PORT, () => {
-    console.log(`Servidor escuchando en el puerto ${PORT}`);
+app.listen(port, () => {
+    console.log(`Servidor escuchando en el puerto ${port}`);
 });
 
 
