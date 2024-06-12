@@ -2,6 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+
 const app = express();
 
 const port = process.env.PORT || 3100; 
@@ -327,10 +328,58 @@ app.post('/users', async (req, res) => {
       res.status(500).json({ error: 'Hubo un error al obtener los favoritos del usuario.' });
     }
   });
+
+  //usuario crear de formulario
+  app.post('/usersForm', async (req, res) => {
+    const { nombre, password, email, favs } = req.body;
+  
+    try {
+      // Verifica si el usuario ya existe
+      const userCheck = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+      if (userCheck.rows.length > 0) {
+        // Si el usuario ya existe, devuelve los datos del usuario existente
+        return res.status(200).json(userCheck.rows[0]);
+      }
+  
+      // Inserta el nuevo usuario
+      const result = await pool.query(
+        'INSERT INTO users (first_name, last_name, email, favs) VALUES ($1, $2, $3, $4) RETURNING *',
+        [nombre, password, email, favs]
+      );
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Hubo un error al crear el usuario.' });
+    }
+  });
+
+  //loguin
+  app.post('/loginForm', async (req, res) => {
+    const { name, password } = req.body;
+  
+    try {
+      // Busca al usuario por nombre y apellido
+      const userCheck = await pool.query('SELECT * FROM users WHERE first_name = $1 AND last_name = $2', [name, password]);
+  
+      if (userCheck.rows.length === 0) {
+        return res.status(401).json({ error: 'Credenciales incorrectas' });
+      }
+  
+      // Si el usuario existe, devuelve sus datos
+      const user = userCheck.rows[0];
+      res.status(200).json({ message: 'Aprobado', user });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Hubo un error al autenticar el usuario.' });
+    }
+  });
+
+
 // Inicia el servidor
 app.listen(port, () => {
     console.log(`Servidor escuchando en el puerto ${port}`);
 });
+
 
 
 //hacer npm install ya que se añadio la dependencia de pg
