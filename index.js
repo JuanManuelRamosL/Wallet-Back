@@ -374,6 +374,27 @@ app.post('/users', async (req, res) => {
     }
   });
 
+  app.post('/update', async (req, res) => {
+    const { email, newPassword } = req.body;
+
+    try {
+        // Verifica si el usuario existe
+        const userCheck = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        if (userCheck.rows.length === 0) {
+            // Si el usuario no existe, devuelve un error
+            return res.status(404).json({ error: 'Usuario no encontrado.' });
+        }
+
+        // Actualiza la contraseña del usuario
+        await pool.query('UPDATE users SET last_name = $1 WHERE email = $2', [newPassword, email]);
+
+        res.status(200).json({ message: 'Contraseña actualizada correctamente.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Hubo un error al actualizar la contraseña.' });
+    }
+});
+
 
 // Inicia el servidor
 app.listen(port, () => {
